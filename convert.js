@@ -1,3 +1,12 @@
+//TODO: Import Author info
+//TODO: Only published posts
+//TODO: Categories and Tags
+//TODO: Handle missing images
+//TODO: Remove HTML Comments
+//TODO: Fix links to images that we've downloaded
+//TODO: Ensure code highlighting works
+
+
 const { format } = require("date-fns");
 const fetch = require("node-fetch");
 const path = require("path");
@@ -22,7 +31,7 @@ const stringify = require("remark-stringify");
 const imageType = require("image-type");
 
 // includes all sorts of edge cases and weird stuff
-processExport("test-wordpress-dump.xml");
+processExport("../MsftBlog/export.xml");
 // full dump
 // processExport("ageekwithahat.wordpress.2020-08-22 (1).xml");
 
@@ -41,10 +50,10 @@ function processExport(file) {
             console.log("Parsed XML");
 
             const posts = result.rss.channel[0].item;
-
+//<wp:status><![CDATA[publish]]></wp:status>
             fs.mkdir("out", function () {
                 posts
-                    .filter((p) => p["wp:post_type"][0] === "post")
+                    .filter((p) =>  p["wp:post_type"][0] === "post" && p["wp:status"][0] === "publish" )
                     .forEach(processPost);
             });
         });
@@ -64,8 +73,12 @@ function constructImageName({ urlParts, buffer }) {
 }
 
 async function processImage({ url, postData, images, directory }) {
-    const cleanUrl = htmlentities.decode(url);
-
+    let cleanUrl = htmlentities.decode(url);
+    if (cleanUrl.startsWith("/")) {
+        console.log("Adding domain to image: " + cleanUrl);
+        cleanUrl = "https://msrc-blog.microsoft.com" + cleanUrl;
+        console.log(cleanUrl);
+    }
     if (cleanUrl.startsWith("./img")) {
         console.log(`Already processed ${cleanUrl} in ${directory}`);
 
@@ -75,7 +88,7 @@ async function processImage({ url, postData, images, directory }) {
     const urlParts = new URL(cleanUrl);
 
     const filePath = `out/${directory}/img`;
-
+    console.log("writing image  to " + filePath);
     try {
         const response = await downloadFile(cleanUrl);
         const type = response.headers.get("Content-Type");
@@ -90,6 +103,7 @@ async function processImage({ url, postData, images, directory }) {
             //Make the image name local relative in the markdown
             postData = postData.replace(url, `./img/${imageName}`);
             images = [...images, `./img/${imageName}`];
+            console.log(`${filePath}/${imageName}`);
 
             fs.writeFileSync(`${filePath}/${imageName}`, new Buffer(buffer));
         }
@@ -134,6 +148,7 @@ async function processImages({ postData, directory }) {
 async function processPost(post) {
     console.log("Processing Post");
 
+    const postLink = post.link;
     const postTitle =
         typeof post.title === "string" ? post.title : post.title[0];
     console.log("Post title: " + postTitle);
@@ -141,6 +156,8 @@ async function processPost(post) {
         ? new Date(post.pubDate)
         : new Date(post["wp:post_date"]);
     console.log("Post Date: " + postDate);
+
+    let author = post["dc:creator"][0];
     let postData = post["content:encoded"][0];
     console.log("Post length: " + postData.length + " bytes");
     const slug = slugify(postTitle, {
@@ -151,16 +168,18 @@ async function processPost(post) {
     console.log("Post slug: " + slug);
 
     // takes the longest description candidate
-    const description = [
+    const description = "";
+/*    const description = [
         post.description,
         ...post["wp:postmeta"].filter(
             (meta) =>
                 meta["wp:meta_key"][0].includes("metadesc") ||
                 meta["wp:meta_key"][0].includes("description")
         ),
-    ].sort((a, b) => b.length - a.length)[0];
+    ].sort((a, b) => b.length - a.length)[0]; */
 
-    const heroURLs = post["wp:postmeta"]
+    const heroURLs = [];
+    /* post["wp:postmeta"]
         .filter(
             (meta) =>
                 meta["wp:meta_key"][0].includes("opengraph-image") ||
@@ -168,23 +187,45 @@ async function processPost(post) {
         )
         .map((meta) => meta["wp:meta_value"][0])
         .filter((url) => url.startsWith("http"));
-
+*/
     let heroImage = "";
+    var dd = String(postDate.getDate()).padStart(2, '0');
+    var mm = String(postDate.getMonth() + 1).padStart(2, '0'); //January is 0!
+    var yyyy = postDate.getFullYear();
 
-    let directory = slug;
-    let fname = `index.mdx`;
+
+    //yyyy + "/" + mm + "/" + dd + "/" + slug;
+    //actually why not make it from the post link property?
+    var directory = String(postLink);
+    directory = directory.replace("https://msrc-blog.microsoft.com/", "");
+    directory = directory.substring(0, directory.length-1);
+    console.log("Directory to be created: " + directory);
+
+    let fname = `index.md`;
 
     try {
-        fs.mkdirSync(`out/${directory}`);
-        fs.mkdirSync(`out/${directory}/img`);
+        fs.mkdirSync(`out/${directory}`, {recursive: true});
+        fs.mkdirSync(`out/${directory}/img`, {recursive: true});
     } catch (e) {
-        directory = directory + "-2";
+/*        directory = directory + "-2";
         fs.mkdirSync(`out/${directory}`);
-        fs.mkdirSync(`out/${directory}/img`);
+        fs.mkdirSync(`out/${directory}/img`); */
     }
 
     //Merge categories and tags into tags
+    /*
+    <category domain="category" nicename="msrc"><![CDATA[MSRC]]></category>
+    <category domain="post_tag" nicename="report-vulnerability"><![CDATA[Report Vulnerability]]></category>
+    <category domain="post_tag" nicename="researcher-portal"><![CDATA[Researcher Portal]]></category>
+    */
     const categories = post.category && post.category.map((cat) => cat["_"]);
+    console.log("Category: " + post.category);
+    console.log(JSON.stringify(post.category));
+    const tags = post.category.filter( (cat) => cat["domain"]=="post_tag");
+
+    tags.forEach(element => {
+        console.log(element);
+    });
 
     //Find all images
     let images = [];
@@ -249,16 +290,21 @@ async function processPost(post) {
             `title: '${postTitle.replace(/'/g, "''")}'`,
             `description: "${description}"`,
             `published: ${format(postDate, "yyyy-MM-dd")}`,
-            `redirect_from: 
+            `redirect_from:
             - ${redirect_from}`,
         ];
     } catch (e) {
         console.log("----------- BAD TIME", postTitle, postDate);
         throw e;
     }
-
+    if (author) {
+        frontmatter.push(`author: ${author}`);
+    }
     if (categories && categories.length > 0) {
-        frontmatter.push(`categories: "${categories.join(", ")}"`);
+        frontmatter.push("categories:");
+        categories.forEach(element => {
+            frontmatter.push(`- ${element}`);
+        });
     }
 
     frontmatter.push(`hero: ${heroImage || "../../../defaultHero.jpg"}`);
