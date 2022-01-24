@@ -101,7 +101,7 @@ async function processImage({ url, postData, images, directory }) {
             });
 
             //Make the image name local relative in the markdown
-            postData = postData.replace(url, `./img/${imageName}`);
+            postData = postData.replaceAll(url, `./img/${imageName}`);
             images = [...images, `./img/${imageName}`];
             console.log(`${filePath}/${imageName}`);
 
@@ -290,6 +290,7 @@ async function processPost(post) {
             `title: '${postTitle.replace(/'/g, "''")}'`,
             `description: "${description}"`,
             `published: ${format(postDate, "yyyy-MM-dd")}`,
+            `type: posts`,
             `redirect_from:
             - ${redirect_from}`,
         ];
