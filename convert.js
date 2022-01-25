@@ -217,15 +217,14 @@ async function processPost(post) {
     <category domain="category" nicename="msrc"><![CDATA[MSRC]]></category>
     <category domain="post_tag" nicename="report-vulnerability"><![CDATA[Report Vulnerability]]></category>
     <category domain="post_tag" nicename="researcher-portal"><![CDATA[Researcher Portal]]></category>
-    */
-    const categories = post.category && post.category.map((cat) => cat["_"]);
-    console.log("Category: " + post.category);
-    console.log(JSON.stringify(post.category));
-    const tags = post.category.filter( (cat) => cat["domain"]=="post_tag");
+    		<wp:cat_name><![CDATA[Security Research &amp; Defense]]></wp:cat_name>
 
-    tags.forEach(element => {
-        console.log(element);
-    });
+    */
+    const catList = post.category.filter((cat) => cat["$"].domain=="category");
+    const tagList = post.category.filter((cat) => cat["$"].domain=="post_tag");
+
+    const categories = catList && catList.map((cat) => htmlentities.decode(cat["_"]));
+    const tags = tagList && tagList.map((cat) => htmlentities.decode(cat["_"]));
 
     //Find all images
     let images = [];
@@ -299,11 +298,18 @@ async function processPost(post) {
         throw e;
     }
     if (author) {
-        frontmatter.push(`author: ${author}`);
+        frontmatter.push(`authors:`);
+        frontmatter.push(`- ${author}`);
     }
     if (categories && categories.length > 0) {
         frontmatter.push("categories:");
         categories.forEach(element => {
+            frontmatter.push(`- ${element}`);
+        });
+    }
+    if (tags && tags.length > 0) {
+        frontmatter.push("tags:");
+        tags.forEach(element => {
             frontmatter.push(`- ${element}`);
         });
     }
