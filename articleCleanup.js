@@ -5,6 +5,7 @@ const prettier = require("prettier");
 
 function fixBadHTML(html) {
     html = html.replace(/(\r?\n){2}/g, "<p></p>");
+    html = html.replace(/<!-- \/?wp\:[\s\S]*?-->/g, "");
     return html;
 }
 

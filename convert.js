@@ -32,6 +32,7 @@ const imageType = require("image-type");
 
 // includes all sorts of edge cases and weird stuff
 processExport("../MsftBlog/export.xml");
+const date_notBefore = new Date(2019,01,01);
 // full dump
 // processExport("ageekwithahat.wordpress.2020-08-22 (1).xml");
 
@@ -53,7 +54,7 @@ function processExport(file) {
 //<wp:status><![CDATA[publish]]></wp:status>
             fs.mkdir("out", function () {
                 posts
-                    .filter((p) =>  p["wp:post_type"][0] === "post" && p["wp:status"][0] === "publish" )
+                    .filter((p) =>  p["wp:post_type"][0] === "post" && p["wp:status"][0] === "publish"  )
                     .forEach(processPost);
             });
         });
@@ -155,6 +156,11 @@ async function processPost(post) {
     const postDate = isFinite(new Date(post.pubDate))
         ? new Date(post.pubDate)
         : new Date(post["wp:post_date"]);
+
+    if (postDate < date_notBefore) {
+        return;
+    }
+
     console.log("Post Date: " + postDate);
 
     let author = post["dc:creator"][0];
