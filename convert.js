@@ -218,19 +218,18 @@ async function processPost(post) {
         fs.mkdirSync(`out/${directory}/img`); */
     }
 
-    //Merge categories and tags into tags
-    /*
-    <category domain="category" nicename="msrc"><![CDATA[MSRC]]></category>
-    <category domain="post_tag" nicename="report-vulnerability"><![CDATA[Report Vulnerability]]></category>
-    <category domain="post_tag" nicename="researcher-portal"><![CDATA[Researcher Portal]]></category>
-    		<wp:cat_name><![CDATA[Security Research &amp; Defense]]></wp:cat_name>
+    //Split categories and tags
 
-    */
     const catList = post.category.filter((cat) => cat["$"].domain=="category");
     const tagList = post.category.filter((cat) => cat["$"].domain=="post_tag");
 
     const categories = catList && catList.map((cat) => htmlentities.decode(cat["_"]));
     const tags = tagList && tagList.map((cat) => htmlentities.decode(cat["_"]));
+
+    if (categories.indexOf("Japan Security Team") > -1) {
+        return;
+    }
+
 
     //Find all images
     let images = [];
@@ -320,7 +319,12 @@ async function processPost(post) {
         });
     }
 
-    frontmatter.push(`hero: ${heroImage || "../../../defaultHero.jpg"}`);
+    //TODO: probably better to leave this as relative, fix in the theme
+    if (heroImage) {
+        heroImage = "/blog/" + directory.replace("\\","/") + "/" + heroImage.replace("./img", "img");
+        frontmatter.push(`hero: ${heroImage}`);
+    }
+
     frontmatter.push("---");
     frontmatter.push("");
 
